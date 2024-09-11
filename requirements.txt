@@ -1,0 +1,12 @@
+langchain
+langchain-community
+langchain-experimental
+langchain-openai
+openai
+psycopg2
+fastapi
+fastapi-cors
+pyodbc
+uvicorn
+gunicorn
+firebase-admin
