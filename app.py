@@ -2,7 +2,8 @@ from operator import itemgetter
 from fastapi import FastAPI, HTTPException, Depends, Security
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
-from firebase_admin import auth as firebase_auth, initialize_app
+import firebase_admin
+from firebase_admin import credentials, auth
 from sqlalchemy import create_engine
 from geoalchemy2 import Geometry
 from langchain import OpenAI
@@ -14,10 +15,12 @@ from langchain_community.utilities import SQLDatabase
 from langchain_core.runnables import RunnablePassthrough, Runnable
 from langchain.chains import create_sql_query_chain
 from langchain_openai import ChatOpenAI
-
 from fastapi.middleware.cors import CORSMiddleware
 import os
+import gc
+
 import logging
+
 logging.basicConfig(
     level=logging.INFO,  # Set the logging level
     format='%(asctime)s - %(levelname)s - %(message)s'  # Customize the log message format
@@ -40,7 +43,8 @@ Then you should query the schema of the most relevant tables."""
 
 system_message = SystemMessage(content=SQL_PREFIX)
 
-initialize_app()
+cred = credentials.Certificate("./firebase-adminsdk.json")
+firebase_admin.initialize_app(cred)
 
 # Initialize FastAPI app
 app = FastAPI()
@@ -175,36 +179,48 @@ class NaturalLanguageQueryRequest(BaseModel):
 
 def process_query(natural_language_query):
     try:
-        logging.info(f"Processing query {natural_language_query}")
-        # Prepare the necessary information for the prompt
-        table_names = db.get_usable_table_names()  # Get available table names
-        example_geospatial_functions = "ST_Intersects, ST_Distance, ST_Within, ST_Buffer"  # Add more functions as needed
+        logging.info(f"Processing query: {natural_language_query}")
 
-        # Invoke the db_chain with the user's query and additional context
+        # Prepare the necessary information
+        table_names = db.get_usable_table_names()  # Ensure this is efficient
+        example_geospatial_functions = "ST_Intersects, ST_Distance, ST_Within, ST_Buffer"
+
+        # Optimize call to write_query
         query_result = write_query.invoke({"question": natural_language_query})
-        logging.info(f"Got query response: {query_result}")
+        logging.info(f"Got query response: {query_result[:500]}...")  # Log only part of the response if it's large
+
+        # Optimize call to execute_query
         execute_result = execute_query.invoke({"query": strip_markdown_formatting(query_result)})
-        logging.info(f"Got execute response: {execute_result}")
+        logging.info(f"Got execute response: {execute_result[:500]}...")  # Log only part of the response if it's large
+
+
         prompt_input = {"question": "User question", "query": query_result, "result": execute_result}
         formatted_prompt = answer_prompt.format(**prompt_input)
-        logging.info(f"Generated prompt: {formatted_prompt}")
+        logging.info(f"Generated prompt: {formatted_prompt[:500]}...")  # Log only part of the prompt if it's large
+        
+        del query_result
 
+        del execute_result
+
+        # Optimize call to llm
         llm_response = llm.invoke(formatted_prompt)
-        logging.info(f"LLM response: {llm_response}")
+        #logging.info(f"LLM response: {llm_response}...")  # Log only part of the response if it's large
 
+        del formatted_prompt
+
+        # Parse the output
         parsed_output = StrOutputParser().invoke(llm_response)
-        logging.info(f"Parsed final output: {parsed_output}")
-        #result = db_chain.invoke({
-        #    "input": natural_language_query,
-        #    "table_info": table_names,
-        #    "top_k": 5
-        #})
+        logging.info(f"Parsed final output: {parsed_output[:500]}...")  # Log only part of the parsed output if it's large
 
         return parsed_output
 
     except Exception as e:
-        print(f"Error processing query: {e}")
+        logging.error(f"Error processing query: {e}", exc_info=True)
         return "An error occurred while processing your request."
+
+    finally:
+        # Optionally force garbage collection
+        gc.collect()
 
 # Firebase Authentication Dependency
 security = HTTPBearer()
@@ -212,7 +228,7 @@ async def firebase_auth_dep(credentials: HTTPAuthorizationCredentials = Security
     token = credentials.credentials
     try:
         # Verify the token using Firebase Admin SDK
-        decoded_token = firebase_auth.verify_id_token(token)
+        decoded_token = auth.verify_id_token(token)
         return decoded_token
     except Exception as e:
         raise HTTPException(status_code=401, detail="Invalid Firebase ID token")
@@ -233,7 +249,7 @@ async def run_query_with_logging(natural_language_query: str):
 
 # POST route to process natural language queries
 @app.post("/query")
-async def query_db(data: NaturalLanguageQueryRequest):#, user_data: dict = Depends(firebase_auth_dep)):
+async def query_db(data: NaturalLanguageQueryRequest, user_data: dict = Depends(firebase_auth_dep)):
     logging.info(f"Received query: {data.natural_language_query}")
     
     try:
