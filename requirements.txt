@@ -1,12 +1,46 @@
-langchain
-langchain-community
-langchain-experimental
-langchain-openai
-openai
-psycopg2
-fastapi
-fastapi-cors
-pyodbc
-uvicorn
-gunicorn
-firebase-admin
+# LangChain Dependencies
+langchain                      # Core LangChain library for chaining LLMs
+langchain-community              # Community extensions and tools for LangChain
+langchain-experimental           # Experimental features for LangChain
+langchain-openai                 # OpenAI integration for LangChain
+
+# LLM and OpenAI Model Integration
+openai                          # OpenAI API client to interact with GPT models
+
+# Database and SQL
+psycopg2                        # PostgreSQL adapter for Python
+sqlalchemy                       # ORM and SQL toolkit
+geoalchemy2
+sqlmodel                         # SQLModel simplifies SQLAlchemy integration
+
+# FastAPI and Server Setup
+fastapi                        # Web framework for building APIs
+uvicorn                         # ASGI server for serving FastAPI apps
+gunicorn                        # Production WSGI server to run the app
+
+# Firebase Admin SDK for authentication
+firebase-admin                   # Firebase Admin SDK for handling auth
+
+# Cross-Origin Resource Sharing (CORS) Middleware
+fastapi-cors                     # CORS middleware for FastAPI
+
+# Optional: For interaction with Azure (if needed)
+pyodbc==4.0.35                          # ODBC database adapter for Azure SQL or other databases
+
+# Optional: Caching, if you are using Redis or similar
+redis==4.5.0                            # For caching frequently used results
+
+# Optional: Langsmith for Observability and Evaluation
+langsmith==0.0.84                        # Langsmith for tracking LangChain executions and prompts
+
+# Optional: Testing Utilities
+httpx==0.24.0                           # HTTP client for making asynchronous requests (useful for testing APIs)
+pytest==7.4.0                           # Unit testing framework for Python
+pytest-asyncio==0.21.1                  # Adds asyncio support to pytest for testing async code
+
+# Optional: Environment Variable Management
+python-dotenv==1.0.0                    # Manage environment variables from .env file
+
+# Optional: Security Dependencies
+python-jose==3.3.0                      # JWT token management for securing API routes
+passlib==1.7.4                          # Password
